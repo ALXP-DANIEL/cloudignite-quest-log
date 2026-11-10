@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "CloudIgnite Quest Log",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "A game-themed checklist for your AWS re/Start Canvas course.",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
     "https://awsrestart.instructure.com/*",
-    "https://labs.vocareum.com/*"
+    "https://labs.vocareum.com/*",
+    "https://emergingtalent.contentcontroller.com/*"
   ],
   "content_scripts": [
     {
@@ -29,6 +30,16 @@
         "lab-celebration.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://emergingtalent.contentcontroller.com/*"
+      ],
+      "js": [
+        "kc-celebration.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "action": {

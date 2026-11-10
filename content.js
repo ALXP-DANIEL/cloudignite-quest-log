@@ -25,6 +25,13 @@
       chrome.storage.local.set({course:merged,snapshotAt:new Date().toISOString()});
     });
   }
+  if (/\/assignments\/\d+/.test(location.pathname)) {
+    const rememberCheck = () => {
+      const title=(document.querySelector('h1')?.innerText||'').trim();
+      if (/^KC\s*[-–]/i.test(title)) chrome.storage.local.set({activeKnowledgeCheck: {title, at: Date.now()}});
+    };
+    rememberCheck(); setTimeout(rememberCheck, 1500);
+  }
   // A slide counts as opened only after its actual Canvas item page loads.
   const match = location.pathname.match(/\/modules\/items\/(\d+)/);
   if (match && /successfully loaded|external tool/i.test(document.body.innerText)) {
