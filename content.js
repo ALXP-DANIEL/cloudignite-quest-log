@@ -25,6 +25,36 @@
       chrome.storage.local.set({course:merged,snapshotAt:new Date().toISOString()});
     });
   }
-  if (!/^\/courses\/4611\/modules(?:\/|$)/.test(location.pathname)) return;
+  // A slide counts as opened only after its actual Canvas item page loads.
+  const match = location.pathname.match(/\/modules\/items\/(\d+)/);
+  if (match && /successfully loaded|external tool/i.test(document.body.innerText)) {
+    const key = 'context_module_item_' + match[1];
+    chrome.storage.local.get(['course','opened'], data => {
+      const item=(data.course||[]).flatMap(m=>m.items).find(i=>i.id===key);
+      if (item && !/\blab\b|^KC\s*[-–]|quiz|survey/i.test(item.title)) {
+        const opened=data.opened||{}; opened[key]=true; chrome.storage.local.set({opened});
+      }
+    });
+  }
+  // Grade snapshots are only interpreted as passed when Canvas explicitly shows full marks.
+  if (/\/grades\/?$/.test(location.pathname)) {
+    const scanGrades=()=>{
+      const rows=[...document.querySelectorAll('#grades_summary tr')];
+      if (!rows.length) return;
+      chrome.storage.local.get(['course','passed'], data=>{
+        const items=(data.course||[]).flatMap(m=>m.items), passed=data.passed||{};
+        for(const row of rows){
+          const link=row.querySelector('a[href*="/assignments/"]');
+          if(!link || !/^KC\s*[-–]/i.test(link.textContent.trim())) continue;
+          const matches=items.filter(i=>i.title.trim()===link.textContent.trim());
+          const score=row.innerText.match(/(?:^|\s)(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)(?:\s|$)/);
+          if(matches.length===1 && score && Number(score[2])>0 && Number(score[1])>=Number(score[2])) passed[matches[0].id]=true;
+        }
+        chrome.storage.local.set({passed});
+      });
+    };
+    scanGrades(); new MutationObserver(scanGrades).observe(document.body,{childList:true,subtree:true});
+  }
+  if (!document.querySelector('#context_modules')) return;
   capture(); let timer; new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(capture,800)}).observe(document.querySelector('#context_modules')||document.body,{childList:true,subtree:true});
 })();
