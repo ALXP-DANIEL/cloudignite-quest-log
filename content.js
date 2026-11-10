@@ -35,11 +35,17 @@
     const modules=[...document.querySelectorAll('[id^="context_module_"]')].filter(e=>/^context_module_\d+$/.test(e.id));
     const data=modules.map(m=>{
       const heading=m.querySelector('h2,h3');
-      const items=[...m.querySelectorAll('[id^="context_module_item_"]')].map(row=>{
-        const a=row.querySelector('a[href*="/modules/items/"],a[href*="/assignments/"],a[href*="/quizzes/"]');
-        const title=(a?.innerText||row.querySelector('.item_name')?.innerText||'').trim();
-        return {id:row.id,title,url:a?.href||'',done:!!row.querySelector('.completed,[title*="omplet"],[aria-label*="omplet"]')||/Module item submitted and is complete/i.test(row.innerText)};
-      }).filter(x=>x.title);
+      const byId = new Map();
+      for (const a of m.querySelectorAll('a[href*="/modules/items/"], a[href*="/assignments/"], a[href*="/quizzes/"]')) {
+        const row = a.closest('[id^="context_module_item_"]');
+        const hrefId = a.href.match(/\/modules\/items\/(\d+)/)?.[1];
+        const itemId = row?.id || (hrefId && 'context_module_item_' + hrefId);
+        const title = a.innerText.trim();
+        if (!itemId || !title || byId.has(itemId)) continue;
+        const done = !!row && (!!row.querySelector('.completed,[title*="omplet"],[aria-label*="omplet"]') || /Module item submitted and is complete/i.test(row.innerText));
+        byId.set(itemId, {id:itemId, title, url:a.href, done});
+      }
+      const items=[...byId.values()];
       return {id:m.id,title:heading?.innerText.trim()||'Module',items};
     }).filter(m=>m.items.length);
     if(data.length) chrome.storage.local.get(['course'], old => {
@@ -57,16 +63,27 @@
     };
     rememberCheck(); setTimeout(rememberCheck, 1500);
   }
-  // A slide counts as opened only after its actual Canvas item page loads.
+  // Record a lesson only when its external-tool launch is requested or confirmed.
   const match = location.pathname.match(/\/modules\/items\/(\d+)/);
-  if (match && /successfully loaded|external tool/i.test(document.body.innerText)) {
+  if (match) {
     const key = 'context_module_item_' + match[1];
-    chrome.storage.local.get(['course','opened'], data => {
-      const item=(data.course||[]).flatMap(m=>m.items).find(i=>i.id===key);
-      if (item && !/\blab\b|^KC\s*[-–]|quiz|survey/i.test(item.title)) {
-        const opened=data.opened||{}; opened[key]=true; chrome.storage.local.set({opened});
-      }
-    });
+    const markOpened = () => {
+      const title = document.title.trim();
+      if (!title || /\blab\b|^KC\s*[-–]|quiz|survey/i.test(title)) return;
+      chrome.storage.local.get(['opened'], data => {
+        const opened=data.opened||{};
+        if (!opened[key]) { opened[key]=true; chrome.storage.local.set({opened}); }
+      });
+    };
+    const checkLaunch = () => {
+      if (/This tool was successfully loaded in a new browser window/i.test(document.body.innerText)) markOpened();
+    };
+    document.addEventListener('click', event => {
+      const button=event.target.closest('button, input[type="submit"]');
+      if (button && /load .+ in a new window/i.test(button.innerText || button.value || '')) markOpened();
+    }, true);
+    checkLaunch();
+    new MutationObserver(checkLaunch).observe(document.body,{childList:true,subtree:true});
   }
   // Grade snapshots are only interpreted as passed when Canvas explicitly shows full marks.
   if (/\/grades\/?$/.test(location.pathname)) {

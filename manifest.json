@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CloudIgnite Quest Log",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "A game-themed checklist for your AWS re/Start Canvas course.",
   "permissions": [
     "storage"
