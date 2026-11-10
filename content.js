@@ -3,7 +3,7 @@
   if(document.getElementById(id)) return;
   const button=document.createElement('button');
   button.id=id; button.textContent='⚡ QUEST LOG';
-  Object.assign(button.style,{position:'fixed',right:'18px',bottom:'20px',zIndex:'2147483647',background:'#d2ff58',color:'#121a13',border:'0',borderRadius:'12px',padding:'14px 18px',fontWeight:'900',fontSize:'14px',cursor:'pointer',boxShadow:'0 8px 25px #0006'});
+  Object.assign(button.style,{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:'12px',maxWidth:'calc(100vw - 24px)',whiteSpace:'nowrap',zIndex:'2147483647',background:'#d2ff58',color:'#121a13',border:'0',borderRadius:'12px',padding:'14px 18px',fontWeight:'900',fontSize:'14px',cursor:'pointer',boxShadow:'0 8px 25px #0006'});
   button.onclick=()=>chrome.runtime.sendMessage({action:'openQuest'});
   document.body.append(button);
   function capture(){
