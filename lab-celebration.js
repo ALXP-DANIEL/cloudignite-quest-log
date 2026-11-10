@@ -2,7 +2,8 @@
   if (window.top !== window || !new URL(location.href).searchParams.has('asnid')) return;
   const labId = new URL(location.href).searchParams.get('asnid');
   const pendingKey = `lab-end-${labId}`;
-  let ending = false, celebrating = false, audioContext;
+  const seenKey = `lab-celebrated-${labId}`;
+  let ending = false, celebrating = false, scoreSeen = false, audioContext;
   const observed = new Set();
 
   function fanfare() {
@@ -23,6 +24,7 @@
     if (celebrating) return;
     celebrating = true;
     chrome.storage.local.remove(pendingKey);
+    chrome.storage.local.set({[seenKey]: true});
     const overlay = document.createElement('div');
     overlay.setAttribute('role', 'status'); overlay.setAttribute('aria-live', 'polite');
     overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:radial-gradient(circle,#263d1cdd,#080f1cbb);display:grid;place-items:center;font-family:monospace;text-align:center';
@@ -47,14 +49,16 @@
     return false;
   }
   function check() {
-    if (!ending || celebrating) return;
+    if (celebrating) return;
+    if (gradeRecorded()) scoreSeen = true;
     const text = document.querySelector('#modal-table-report-aws')?.innerText || '';
     const ended = /resources are terminating|DELETE has been initiated|lab status:\s*(?:ended|terminated)/i.test(text) || /00:00:00/.test(document.querySelector('#idenav')?.innerText || '');
-    if (ended && gradeRecorded()) showCelebration();
+    if (ended && scoreSeen) showCelebration();
   }
   document.addEventListener('click', event => {
     const button = event.target.closest('button, input[type=button], a');
     if (!button) return;
+    if (button.id === 'startawslab') { scoreSeen = false; celebrating = false; ending = false; chrome.storage.local.remove([pendingKey, seenKey]); }
     if (button.id === 'endawslab') { ending = true; chrome.storage.local.set({[pendingKey]:true}); }
     if (button.id === 'gradesIdeBtn') ending && setTimeout(check, 1200);
     setTimeout(check, 500);
@@ -62,10 +66,10 @@
   function watchFrames() {
     for (const frame of document.querySelectorAll('iframe')) {
       if (observed.has(frame)) continue;
-      observed.add(frame); frame.addEventListener('load', () => { setTimeout(check, 300); });
+      observed.add(frame); frame.addEventListener('load', () => { setTimeout(check, 300); try { const doc=frame.contentDocument; if(doc && /grades_review/.test(frame.src)) new MutationObserver(check).observe(doc.documentElement,{childList:true,subtree:true,characterData:true}); } catch (_) {} });
     }
   }
   const observer = new MutationObserver(() => { watchFrames(); check(); });
   observer.observe(document.documentElement, {childList:true, subtree:true, characterData:true});
-  chrome.storage.local.get([pendingKey], data => { ending=!!data[pendingKey]; watchFrames(); check(); });
+  chrome.storage.local.get([pendingKey, seenKey], data => { ending=!!data[pendingKey]; celebrating=!!data[seenKey]; watchFrames(); check(); });
 })();
