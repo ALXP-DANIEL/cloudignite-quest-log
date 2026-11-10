@@ -25,5 +25,6 @@
       chrome.storage.local.set({course:merged,snapshotAt:new Date().toISOString()});
     });
   }
+  if (!/^\/courses\/4611\/modules(?:\/|$)/.test(location.pathname)) return;
   capture(); let timer; new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(capture,800)}).observe(document.querySelector('#context_modules')||document.body,{childList:true,subtree:true});
 })();
