@@ -6,6 +6,31 @@
   Object.assign(button.style,{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:'12px',maxWidth:'calc(100vw - 24px)',whiteSpace:'nowrap',zIndex:'2147483647',background:'#d2ff58',color:'#121a13',border:'0',borderRadius:'12px',padding:'14px 18px',fontWeight:'900',fontSize:'14px',cursor:'pointer',boxShadow:'0 8px 25px #0006'});
   button.onclick=()=>chrome.runtime.sendMessage({action:'openQuest'});
   document.body.append(button);
+  let gradeSyncRunning = false;
+  async function syncGrades() {
+    if (gradeSyncRunning) return;
+    gradeSyncRunning = true;
+    try {
+      const response = await fetch('/courses/4611/grades', {credentials:'same-origin'});
+      if (!response.ok) return;
+      const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const rows = [...doc.querySelectorAll('#grades_summary tr')];
+      if (!rows.length) return;
+      const data = await chrome.storage.local.get(['course','passed']);
+      const items = (data.course || []).flatMap(module => module.items);
+      const passed = data.passed || {};
+      for (const row of rows) {
+        const link = row.querySelector('a[href*="/assignments/"]');
+        const title = link?.textContent.trim();
+        if (!title || !/^KC\s*[-–]/i.test(title)) continue;
+        const matches = items.filter(item => item.title.trim() === title);
+        const score = (row.innerText || row.textContent || '').match(/(?:^|\s)(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)(?:\s|$)/);
+        if (matches.length === 1 && score && Number(score[2]) > 0 && Number(score[1]) >= Number(score[2])) passed[matches[0].id] = true;
+      }
+      await chrome.storage.local.set({passed});
+    } catch (error) { console.warn('Quest Log could not refresh grades', error); }
+    finally { gradeSyncRunning = false; }
+  }
   function capture(){
     const modules=[...document.querySelectorAll('[id^="context_module_"]')].filter(e=>/^context_module_\d+$/.test(e.id));
     const data=modules.map(m=>{
@@ -22,7 +47,7 @@
       data.forEach(m => existing.set(m.id, m));
       const order = modules.map(m => m.id);
       const merged = [...existing.values()].sort((a,b) => order.indexOf(a.id)-order.indexOf(b.id));
-      chrome.storage.local.set({course:merged,snapshotAt:new Date().toISOString()});
+      chrome.storage.local.set({course:merged,snapshotAt:new Date().toISOString()}, syncGrades);
     });
   }
   if (/\/assignments\/\d+/.test(location.pathname)) {
